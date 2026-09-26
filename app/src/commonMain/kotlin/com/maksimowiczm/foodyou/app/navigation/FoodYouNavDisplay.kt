@@ -14,6 +14,7 @@ import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
 import com.maksimowiczm.foodyou.app.navigation.FoodYouNavHostRoute.About
+import com.maksimowiczm.foodyou.app.navigation.FoodYouNavHostRoute.AiSettings
 import com.maksimowiczm.foodyou.app.navigation.FoodYouNavHostRoute.Colors
 import com.maksimowiczm.foodyou.app.navigation.FoodYouNavHostRoute.Contributors
 import com.maksimowiczm.foodyou.app.navigation.FoodYouNavHostRoute.CreateProduct
@@ -68,6 +69,7 @@ import com.maksimowiczm.foodyou.features.privacy.PrivacyScreen
 import com.maksimowiczm.foodyou.features.profile.add.AddProfileScreen
 import com.maksimowiczm.foodyou.features.profile.edit.EditProfileScreen
 import com.maksimowiczm.foodyou.features.settings.SettingsScreen
+import com.maksimowiczm.foodyou.features.settings.ai.AiSettingsScreen
 import com.maksimowiczm.foodyou.features.userproduct.create.CreateProductScreen
 import com.maksimowiczm.foodyou.features.userproduct.edit.EditProductScreen
 import com.maksimowiczm.foodyou.features.userrecipe.create.CreateRecipeScreen
@@ -273,10 +275,14 @@ fun FoodYouNavDisplay(backStack: NavBackStack<NavKey>, modifier: Modifier = Modi
                         onPersonalization = { backStack.add(Personalization) },
                         onLanguage = { backStack.add(Language) },
                         onPrivacy = { backStack.add(Privacy) },
+                        onAiAssistant = { backStack.add(AiSettings) },
                         onAbout = { backStack.add(About) },
                         onAddProfile = { backStack.add(CreateProfile) },
                         onEditProfile = { backStack.add(EditProfile(it)) },
                     )
+                }
+                entry<AiSettings> {
+                    AiSettingsScreen(onBack = { backStack.removeLastIf<AiSettings>() })
                 }
                 entry<Language> { LanguageScreen(onBack = { backStack.removeLastIf<Language>() }) }
                 entry<NutritionFactsPersonalization> {
@@ -558,6 +564,8 @@ sealed interface FoodYouNavHostRoute : NavKey {
     @Serializable data object SwitchProfile : FoodYouNavHostRoute
 
     @Serializable data object Language : FoodYouNavHostRoute
+
+    @Serializable data object AiSettings : FoodYouNavHostRoute
 
     @Serializable data object NutritionFactsPersonalization : FoodYouNavHostRoute
 

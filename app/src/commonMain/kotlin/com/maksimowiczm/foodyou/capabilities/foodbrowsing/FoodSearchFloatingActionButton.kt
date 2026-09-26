@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LunchDining
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
@@ -30,6 +31,7 @@ fun FoodSearchFloatingActionButton(
     onFabExpandedChange: (Boolean) -> Unit,
     onCreateRecipe: () -> Unit,
     onCreateProduct: () -> Unit,
+    onAiFoodInput: () -> Unit,
     modifier: Modifier = Modifier,
     windowInsets: WindowInsets =
         WindowInsets.systemBars
@@ -90,6 +92,15 @@ fun FoodSearchFloatingActionButton(
             },
             icon = { Icon(Icons.Filled.LunchDining, null) },
             text = { Text(stringResource(Res.string.headline_product)) },
+        )
+        FloatingActionButtonMenuItem(
+            modifier = Modifier,
+            onClick = {
+                onAiFoodInput()
+                onFabExpandedChange(false)
+            },
+            icon = { Icon(Icons.Outlined.AutoAwesome, null) },
+            text = { Text(stringResource(Res.string.headline_ai_food_input)) },
         )
     }
 }

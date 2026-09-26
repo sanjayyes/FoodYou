@@ -62,6 +62,7 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.maksimowiczm.foodyou.account.domain.HomeCard
+import com.maksimowiczm.foodyou.ai.domain.ParsedFoodEntry
 import com.maksimowiczm.foodyou.app.navigation.Crossfade
 import com.maksimowiczm.foodyou.capabilities.foodbrowsing.CollectionFilter
 import com.maksimowiczm.foodyou.capabilities.foodbrowsing.FoodSearchFloatingActionButton
@@ -79,7 +80,10 @@ import com.maksimowiczm.foodyou.capabilities.theme.PreviewFoodYouTheme
 import com.maksimowiczm.foodyou.common.RemoteData
 import com.maksimowiczm.foodyou.common.domain.ProfileId
 import com.maksimowiczm.foodyou.common.domain.food.Quantity
+import com.maksimowiczm.foodyou.common.domain.food.ServingQuantity
 import com.maksimowiczm.foodyou.common.domain.search.SearchQuery
+import com.maksimowiczm.foodyou.features.ai.AiFoodInputDialog
+import com.maksimowiczm.foodyou.features.ai.CreateProductFromParsedFood
 import com.maksimowiczm.foodyou.features.home.ui.calendar.CalendarCard
 import com.maksimowiczm.foodyou.fooddatacentral.domain.FoodDataCentralProduct
 import com.maksimowiczm.foodyou.fooddatacentral.domain.FoodDataCentralProductId
@@ -106,6 +110,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -124,6 +129,8 @@ fun HomeScreen(
 ) {
     val searchViewModel: SearchViewModel = koinViewModel { parametersOf(initialQuery) }
     val viewModel: HomeViewModel = koinViewModel()
+    val createProductFromParsedFood: CreateProductFromParsedFood = koinInject()
+    val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val searchQuery by searchViewModel.searchQuery.collectAsStateWithLifecycle()
@@ -185,6 +192,17 @@ fun HomeScreen(
         },
         onEntry = onEntry,
         onDeleteEntry = viewModel::deleteDiaryEntry,
+        onAiFoodSelected = { entry ->
+            scope.launch {
+                val id = createProductFromParsedFood(entry)
+                onUserProduct(
+                    id,
+                    ServingQuantity(servings = 1.0),
+                    uiState.activeMeal?.id,
+                    uiState.date,
+                )
+            }
+        },
         modifier = modifier,
     )
 }
@@ -215,6 +233,7 @@ fun HomeScreenContent(
     onCollectionSelected: (SearchCollection) -> Unit,
     onEntry: (FoodDiaryEntryId) -> Unit,
     onDeleteEntry: (FoodDiaryEntryId) -> Unit,
+    onAiFoodSelected: (ParsedFoodEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -296,6 +315,17 @@ fun HomeScreenContent(
         },
     )
 
+    val showAiFoodInput = rememberSaveable { mutableStateOf(false) }
+    if (showAiFoodInput.value) {
+        AiFoodInputDialog(
+            onDismissRequest = { showAiFoodInput.value = false },
+            onFoodSelected = {
+                showAiFoodInput.value = false
+                onAiFoodSelected(it)
+            },
+        )
+    }
+
     Box {
         ScrimWithPredictiveBack(
             visible = fabExpanded.value,
@@ -307,6 +337,7 @@ fun HomeScreenContent(
             onFabExpandedChange = { fabExpanded.value = it },
             onCreateRecipe = onCreateRecipe,
             onCreateProduct = onCreateProduct,
+            onAiFoodInput = { showAiFoodInput.value = true },
             modifier =
                 Modifier.zIndex(200f)
                     .align(Alignment.BottomEnd)
@@ -618,6 +649,7 @@ private fun HomeScreenPreview() {
             onCollectionSelected = {},
             onEntry = {},
             onDeleteEntry = {},
+            onAiFoodSelected = {},
         )
     }
 }
