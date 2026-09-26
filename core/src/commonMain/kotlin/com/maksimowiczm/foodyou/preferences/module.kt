@@ -3,6 +3,7 @@ package com.maksimowiczm.foodyou.preferences
 import com.maksimowiczm.foodyou.common.event.di.eventHandlerOf
 import com.maksimowiczm.foodyou.preferences.application.RandomizeThemeOnAppLaunchHandler
 import com.maksimowiczm.foodyou.preferences.domain.UserPreferencesRepository
+import com.maksimowiczm.foodyou.preferences.infrastructure.AiProvider
 import com.maksimowiczm.foodyou.preferences.infrastructure.EnergyUnitPreferenceProvider
 import com.maksimowiczm.foodyou.preferences.infrastructure.FoodDiaryEntryTimestampsProvider
 import com.maksimowiczm.foodyou.preferences.infrastructure.HideScreenProvider
@@ -25,6 +26,7 @@ internal fun Module.preferences() {
             EnergyUnitPreferenceProvider(get()),
             NutrientsOrderPreferenceProvider(get()),
             FoodDiaryEntryTimestampsProvider(get()),
+            AiProvider(get()),
         )
     }
         .bind<UserPreferencesRepository>()
