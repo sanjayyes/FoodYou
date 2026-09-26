@@ -1,6 +1,7 @@
 package com.maksimowiczm.foodyou
 
 import com.maksimowiczm.foodyou.account.account
+import com.maksimowiczm.foodyou.ai.ai
 import com.maksimowiczm.foodyou.analytics.analytics
 import com.maksimowiczm.foodyou.common.common
 import com.maksimowiczm.foodyou.common.event.inMemoryEventBus
@@ -16,6 +17,7 @@ import org.koin.dsl.module
 
 val coreModule = module {
     account()
+    ai()
     analytics()
     common()
     inMemoryEventBus()
