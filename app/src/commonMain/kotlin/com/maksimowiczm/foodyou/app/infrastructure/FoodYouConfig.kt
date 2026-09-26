@@ -14,6 +14,7 @@ class FoodYouConfig(val versionName: String) : NetworkConfig {
     val openFoodFactsRegisterUri = "https://world.openfoodfacts.org/cgi/user.pl"
     val foodDataCentralPrivacyPolicyUri = "https://www.usda.gov/privacy-policy"
     val foodDataCentralObtainApiKeyUri = "https://fdc.nal.usda.gov/api-key-signup"
+    val geminiObtainApiKeyUri = "https://aistudio.google.com/apikey"
     val sourceCodeUri = "https://github.com/maksimowiczm/FoodYou"
     val featureRequestUri = "https://github.com/maksimowiczm/FoodYou/issues"
     val bugReportUri = "https://github.com/maksimowiczm/FoodYou/issues"

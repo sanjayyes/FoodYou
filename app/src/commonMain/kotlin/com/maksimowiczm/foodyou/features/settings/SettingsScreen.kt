@@ -41,6 +41,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
@@ -110,6 +111,7 @@ fun SettingsScreen(
     onPersonalization: () -> Unit,
     onLanguage: () -> Unit,
     onPrivacy: () -> Unit,
+    onAiAssistant: () -> Unit,
     onAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -129,6 +131,7 @@ fun SettingsScreen(
         onPersonalization = onPersonalization,
         onLanguage = onLanguage,
         onPrivacy = onPrivacy,
+        onAiAssistant = onAiAssistant,
         onAbout = onAbout,
         modifier = modifier,
     )
@@ -145,6 +148,7 @@ private fun SettingsScreen(
     onPersonalization: () -> Unit,
     onLanguage: () -> Unit,
     onPrivacy: () -> Unit,
+    onAiAssistant: () -> Unit,
     onAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -220,6 +224,7 @@ private fun SettingsScreen(
                     onPersonalization = onPersonalization,
                     onLanguage = onLanguage,
                     onPrivacy = onPrivacy,
+                    onAiAssistant = onAiAssistant,
                     onAbout = onAbout,
                 )
             }
@@ -555,6 +560,7 @@ private fun Settings(
     onPersonalization: () -> Unit,
     onLanguage: () -> Unit,
     onPrivacy: () -> Unit,
+    onAiAssistant: () -> Unit,
     onAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -565,28 +571,38 @@ private fun Settings(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         SegmentedListItem(
             onClick = onPersonalization,
-            shapes = ListItemDefaults.segmentedShapes(index = 0, count = 4),
+            shapes = ListItemDefaults.segmentedShapes(index = 0, count = 5),
             leadingContent = { Icon(Icons.Outlined.Tune, contentDescription = null) },
             colors = colors,
             content = { Text(stringResource(Res.string.headline_personalization)) },
         )
         SegmentedListItem(
             onClick = onLanguage,
-            shapes = ListItemDefaults.segmentedShapes(index = 1, count = 4),
+            shapes = ListItemDefaults.segmentedShapes(index = 1, count = 5),
             leadingContent = { Icon(Icons.Outlined.Translate, contentDescription = null) },
             colors = colors,
             content = { Text(stringResource(Res.string.headline_language)) },
         )
         SegmentedListItem(
             onClick = onPrivacy,
-            shapes = ListItemDefaults.segmentedShapes(index = 2, count = 4),
+            shapes = ListItemDefaults.segmentedShapes(index = 2, count = 5),
             leadingContent = { Icon(Icons.Outlined.PrivacyTip, contentDescription = null) },
             colors = colors,
             content = { Text(stringResource(Res.string.headline_privacy)) },
         )
         SegmentedListItem(
+            onClick = onAiAssistant,
+            shapes = ListItemDefaults.segmentedShapes(index = 3, count = 5),
+            leadingContent = { Icon(Icons.Outlined.AutoAwesome, contentDescription = null) },
+            colors = colors,
+            content = { Text(stringResource(Res.string.headline_ai_assistant)) },
+            supportingContent = {
+                Text(stringResource(Res.string.description_ai_assistant))
+            },
+        )
+        SegmentedListItem(
             onClick = onAbout,
-            shapes = ListItemDefaults.segmentedShapes(index = 3, count = 4),
+            shapes = ListItemDefaults.segmentedShapes(index = 4, count = 5),
             leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
             colors = colors,
             content = { Text(stringResource(Res.string.headline_about)) },
@@ -800,6 +816,7 @@ private fun SettingsScreenPreview() {
             onPersonalization = {},
             onLanguage = {},
             onPrivacy = {},
+            onAiAssistant = {},
             onAbout = {},
         )
     }
