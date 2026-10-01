@@ -12,9 +12,10 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.http.isSuccess
-import kotlinx.io.IOException
-import kotlinx.serialization.SerializationException
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
@@ -48,30 +49,30 @@ internal class GeminiApiClient(
             try {
                 client.post("$BASE_URL/models/$model:$GENERATE_CONTENT_METHOD") {
                     header(API_KEY_HEADER, apiKey)
-                    setBody(
-                        GeminiGenerateRequest(
-                            contents =
-                                listOf(
-                                    GeminiContent(
-                                        parts = listOf(GeminiPart(text = buildPrompt(description)))
-                                    )
-                                ),
-                            generationConfig =
-                                GeminiGenerationConfig(
-                                    responseMimeType = JSON_MIME_TYPE,
-                                    temperature = 0.0,
-                                ),
-                        )
-                    )
+                    // Required: ContentNegotiation only selects a converter for a body when a
+                    // Content-Type is present. Without this the request fails to serialize.
+                    contentType(ContentType.Application.Json)
+                    setBody(buildRequest(description, model))
                 }
-            } catch (e: IOException) {
-                logger.e(e) { "parseFood: transport failure before any response (model=$model)" }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                logger.e(e) { "parseFood: request failed before any response (model=$model)" }
                 throw FoodParsingException.NetworkUnavailable(detail = e.message)
             }
 
         response.throwIfFailure(model)
 
-        val payload = response.body<GeminiGenerateResponse>()
+        val payload =
+            try {
+                response.body<GeminiGenerateResponse>()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                logger.e(e) { "parseFood: could not read response envelope" }
+                throw FoodParsingException.MalformedResponse(detail = e.message)
+            }
+
         val text =
             payload.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
                 ?: run {
@@ -82,12 +83,25 @@ internal class GeminiApiClient(
         val foods =
             try {
                 json.decodeFromString(ListSerializer(GeminiParsedFood.serializer()), text)
-            } catch (e: SerializationException) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
                 logger.e(e) { "parseFood: could not decode model payload" }
                 throw FoodParsingException.MalformedResponse(detail = e.message)
             }
 
-        val entries = foods.filter { it.name.isNotBlank() }.map { it.toDomain() }
+        logger.d { "parseFood: response decoded into ${foods.size} raw foods (model=$model)" }
+
+        val entries =
+            try {
+                foods.filter { it.name.isNotBlank() }.map { it.toDomain() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                logger.e(e) { "parseFood: mapping model output onto the food domain failed" }
+                throw FoodParsingException.MalformedResponse(detail = e.message)
+            }
+
         logger.d { "parseFood: decoded ${entries.size} entries (model=$model)" }
         return entries
     }
@@ -96,16 +110,26 @@ internal class GeminiApiClient(
         val response =
             try {
                 client.get("$BASE_URL/models") { header(API_KEY_HEADER, apiKey) }
-            } catch (e: IOException) {
-                logger.e(e) { "listModels: transport failure before any response" }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                logger.e(e) { "listModels: request failed before any response" }
                 throw FoodParsingException.NetworkUnavailable(detail = e.message)
             }
 
         response.throwIfFailure(model = MODEL_NAME_PREFIX)
 
-        return response
-            .body<GeminiModelsResponse>()
-            .models
+        val models =
+            try {
+                response.body<GeminiModelsResponse>()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                logger.e(e) { "listModels: could not read response envelope" }
+                throw FoodParsingException.MalformedResponse(detail = e.message)
+            }
+
+        return models.models
             .filter { GENERATE_CONTENT_METHOD in it.supportedGenerationMethods }
             .map { it.name.removePrefix(MODEL_NAME_PREFIX) }
             .filter { it.isNotBlank() }
@@ -121,7 +145,9 @@ internal class GeminiApiClient(
         val code = responseStatus.value
         val error = runCatching {
             json.decodeFromString(GeminiErrorResponse.serializer(), bodyAsText())
-        }.getOrNull()?.error
+        }
+            .getOrNull()
+            ?.error
 
         val failure =
             classifyGeminiFailure(
@@ -134,6 +160,20 @@ internal class GeminiApiClient(
         logger.e { "Gemini request failed: ${failure.diagnose()}" }
         throw failure
     }
+
+    /**
+     * Builds the request body for [description].
+     *
+     * Exposed so the exact payload can be asserted in tests: the wire shape is a contract with the
+     * model, and a change here silently degrades parsing quality.
+     */
+    internal fun buildRequest(description: String, model: String): GeminiGenerateRequest =
+        GeminiGenerateRequest(
+            contents =
+                listOf(GeminiContent(parts = listOf(GeminiPart(text = buildPrompt(description))))),
+            generationConfig =
+                GeminiGenerationConfig(responseMimeType = JSON_MIME_TYPE, temperature = 0.0),
+        )
 
     /**
      * Builds the instruction sent to the model.

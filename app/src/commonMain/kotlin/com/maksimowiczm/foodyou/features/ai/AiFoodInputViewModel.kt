@@ -2,10 +2,12 @@ package com.maksimowiczm.foodyou.features.ai
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import co.touchlab.kermit.Logger
 import com.maksimowiczm.foodyou.ai.domain.DEFAULT_GEMINI_MODEL
 import com.maksimowiczm.foodyou.ai.domain.FoodParsingException
 import com.maksimowiczm.foodyou.ai.domain.FoodParsingService
 import com.maksimowiczm.foodyou.ai.domain.ParsedFoodEntry
+import com.maksimowiczm.foodyou.ai.domain.asFoodParsingException
 import com.maksimowiczm.foodyou.preferences.domain.AiPreferences
 import com.maksimowiczm.foodyou.preferences.domain.UserPreferencesRepository
 import com.maksimowiczm.foodyou.preferences.domain.observe
@@ -31,8 +33,11 @@ sealed interface AiFoodInputUiState {
 
 internal class AiFoodInputViewModel(
     private val foodParsingService: FoodParsingService,
+    logger: Logger,
     private val preferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
+
+    private val logger = logger.withTag(TAG)
 
     private val _uiState = MutableStateFlow<AiFoodInputUiState>(AiFoodInputUiState.Input)
     val uiState: StateFlow<AiFoodInputUiState> = _uiState.asStateFlow()
@@ -81,12 +86,12 @@ internal class AiFoodInputViewModel(
                     .fold(
                         onSuccess = { AiFoodInputUiState.Success(it) },
                         onFailure = { throwable ->
-                            AiFoodInputUiState.Error(
-                                throwable as? FoodParsingException
-                                    ?: FoodParsingException.NetworkUnavailable(
-                                        detail = throwable.message
-                                    )
-                            )
+                            // Never let a raw throwable escape silently: without this the UI
+                            // shows a generic message and the real cause is unrecoverable.
+                            logger.e(throwable) {
+                                "parse failed: ${throwable::class.simpleName}: ${throwable.message}"
+                            }
+                            AiFoodInputUiState.Error(throwable.asFoodParsingException())
                         },
                     )
         }
@@ -94,6 +99,10 @@ internal class AiFoodInputViewModel(
 
     fun consume() {
         _uiState.update { AiFoodInputUiState.Input }
+    }
+
+    private companion object {
+        const val TAG = "AiFoodInput"
     }
 
     /** Clears any previous session so the dialog always opens on a blank prompt. */

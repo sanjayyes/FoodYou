@@ -39,3 +39,12 @@ sealed class FoodParsingException(message: String) : Exception(message) {
     data class MalformedResponse(val detail: String?) :
         FoodParsingException("Gemini returned an unexpected payload ($detail)")
 }
+
+/**
+ * Normalizes any throwable into a [FoodParsingException] so the UI never has to guess.
+ *
+ * Transport problems surface as [FoodParsingException.NetworkUnavailable]; anything already
+ * classified by the client is passed through unchanged.
+ */
+fun Throwable.asFoodParsingException(): FoodParsingException =
+    this as? FoodParsingException ?: FoodParsingException.NetworkUnavailable(detail = message)

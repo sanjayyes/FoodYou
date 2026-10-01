@@ -138,9 +138,42 @@ class SearchResultMapper {
             )
         }
 
-    private fun toFoodNameEntity(name: FoodName) =
-        FoodNameEntity(
-            english = name.english,
+    /**
+     * Picks the column that will stand in for [FoodName.fallback].
+     *
+     * `FoodNameEntity` stores only translated names and derives `fallback` from whichever is
+     * present, so a name that carries a fallback but no translations has to land in a real column
+     * or the row persists empty and throws on read.
+     */
+    private fun FoodName.fallbackColumn(): String =
+        english
+            ?: catalan
+            ?: czech
+            ?: danish
+            ?: german
+            ?: spanish
+            ?: french
+            ?: indonesian
+            ?: italian
+            ?: hungarian
+            ?: dutch
+            ?: polish
+            ?: portugueseBrazil
+            ?: portuguesePortugal
+            ?: slovenian
+            ?: turkish
+            ?: russian
+            ?: ukrainian
+            ?: arabic
+            ?: chineseSimplified
+            ?: fallback
+
+    private fun toFoodNameEntity(name: FoodName): FoodNameEntity {
+        val standIn = name.fallbackColumn()
+
+        return FoodNameEntity(
+            // Land a fallback-only name in a real column, otherwise the row persists empty.
+            english = name.english ?: standIn.takeIf { standIn == name.fallback },
             catalan = name.catalan,
             danish = name.danish,
             german = name.german,
@@ -160,6 +193,7 @@ class SearchResultMapper {
             arabic = name.arabic,
             chineseSimplified = name.chineseSimplified,
         )
+    }
 
     private fun toQuantityEntity(quantity: AbsoluteQuantity): QuantityEntity {
         return when (quantity) {
