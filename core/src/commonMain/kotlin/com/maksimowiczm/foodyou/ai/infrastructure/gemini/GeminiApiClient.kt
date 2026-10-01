@@ -13,6 +13,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
+import kotlinx.io.IOException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -41,52 +42,66 @@ internal class GeminiApiClient(
         apiKey: String,
         model: String,
     ): List<ParsedFoodEntry> {
+        logger.d { "parseFood: model=$model descriptionLength=${description.length}" }
+
         val response =
-            client.post("$BASE_URL/models/$model:$GENERATE_CONTENT_METHOD") {
-                header(API_KEY_HEADER, apiKey)
-                setBody(
-                    GeminiGenerateRequest(
-                        contents =
-                            listOf(
-                                GeminiContent(
-                                    parts = listOf(GeminiPart(text = buildPrompt(description)))
-                                )
-                            ),
-                        generationConfig =
-                            GeminiGenerationConfig(
-                                responseMimeType = JSON_MIME_TYPE,
-                                temperature = 0.0,
-                            ),
+            try {
+                client.post("$BASE_URL/models/$model:$GENERATE_CONTENT_METHOD") {
+                    header(API_KEY_HEADER, apiKey)
+                    setBody(
+                        GeminiGenerateRequest(
+                            contents =
+                                listOf(
+                                    GeminiContent(
+                                        parts = listOf(GeminiPart(text = buildPrompt(description)))
+                                    )
+                                ),
+                            generationConfig =
+                                GeminiGenerationConfig(
+                                    responseMimeType = JSON_MIME_TYPE,
+                                    temperature = 0.0,
+                                ),
+                        )
                     )
-                )
+                }
+            } catch (e: IOException) {
+                logger.e(e) { "parseFood: transport failure before any response (model=$model)" }
+                throw FoodParsingException.NetworkUnavailable(detail = e.message)
             }
 
-        response.throwIfFailure()
+        response.throwIfFailure(model)
 
         val payload = response.body<GeminiGenerateResponse>()
         val text =
             payload.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
-                ?: throw FoodParsingException.MalformedResponse(
-                    detail = "no candidates in response"
-                )
+                ?: run {
+                    logger.e { "parseFood: response carried no candidates" }
+                    throw FoodParsingException.MalformedResponse(detail = "no candidates")
+                }
 
         val foods =
             try {
                 json.decodeFromString(ListSerializer(GeminiParsedFood.serializer()), text)
             } catch (e: SerializationException) {
+                logger.e(e) { "parseFood: could not decode model payload" }
                 throw FoodParsingException.MalformedResponse(detail = e.message)
             }
 
-        return foods
-            .filter { it.name.isNotBlank() }
-            .map { it.toDomain() }
-            .also { logger.d { "Decoded ${it.size} foods for model $model" } }
+        val entries = foods.filter { it.name.isNotBlank() }.map { it.toDomain() }
+        logger.d { "parseFood: decoded ${entries.size} entries (model=$model)" }
+        return entries
     }
 
     override suspend fun listModels(apiKey: String): List<String> {
-        val response = client.get("$BASE_URL/models") { header(API_KEY_HEADER, apiKey) }
+        val response =
+            try {
+                client.get("$BASE_URL/models") { header(API_KEY_HEADER, apiKey) }
+            } catch (e: IOException) {
+                logger.e(e) { "listModels: transport failure before any response" }
+                throw FoodParsingException.NetworkUnavailable(detail = e.message)
+            }
 
-        response.throwIfFailure()
+        response.throwIfFailure(model = MODEL_NAME_PREFIX)
 
         return response
             .body<GeminiModelsResponse>()
@@ -96,29 +111,28 @@ internal class GeminiApiClient(
             .filter { it.isNotBlank() }
             .distinct()
             .sorted()
+            .also { logger.d { "listModels: ${it.size} generation-capable models" } }
     }
 
-    private suspend fun HttpResponse.throwIfFailure() {
-        val status = status
-        if (status.isSuccess()) return
+    private suspend fun HttpResponse.throwIfFailure(model: String) {
+        val responseStatus = status
+        if (responseStatus.isSuccess()) return
 
-        val code = status.value
-        val detail = runCatching {
-            json.decodeFromString(
-                GeminiErrorResponse.serializer(),
-                bodyAsText(),
+        val code = responseStatus.value
+        val error = runCatching {
+            json.decodeFromString(GeminiErrorResponse.serializer(), bodyAsText())
+        }.getOrNull()?.error
+
+        val failure =
+            classifyGeminiFailure(
+                httpStatus = code,
+                errorStatus = error?.status,
+                detail = error?.message,
+                model = model,
             )
-        }
-            .getOrNull()
-            ?.error
-            ?.message
 
-        logger.e { "Gemini request failed with $code: $detail" }
-
-        if (code == 400 || code == 401 || code == 403) {
-            throw FoodParsingException.ApiKeyRejected(status = detail)
-        }
-        throw FoodParsingException.RequestFailed(status = code, detail = detail)
+        logger.e { "Gemini request failed: ${failure.diagnose()}" }
+        throw failure
     }
 
     /**

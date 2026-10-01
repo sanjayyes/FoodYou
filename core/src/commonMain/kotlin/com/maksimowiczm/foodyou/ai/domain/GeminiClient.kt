@@ -5,8 +5,12 @@ package com.maksimowiczm.foodyou.ai.domain
  *
  * This is the single source of truth for the default: the settings screen labels it and
  * [FoodParsingService] falls back to it, so the two can never disagree.
+ *
+ * A moving alias rather than a dated snapshot such as `gemini-2.5-flash`, because Google
+ * permanently retires snapshots for new API projects while keeping aliases pointing at a working
+ * model. Verified reachable when this was chosen.
  */
-const val DEFAULT_GEMINI_MODEL: String = "gemini-2.5-flash"
+const val DEFAULT_GEMINI_MODEL: String = "gemini-flash-lite-latest"
 
 /** Transport for the Gemini generative API. */
 interface GeminiClient {
