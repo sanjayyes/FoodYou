@@ -25,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.maksimowiczm.foodyou.ai.domain.FoodParsingException
 import com.maksimowiczm.foodyou.ai.domain.ParsedFoodEntry
 import com.maksimowiczm.foodyou.capabilities.foodbrowsing.FoodSearchListItem
 import com.maksimowiczm.foodyou.common.domain.food.Nutrient
@@ -191,14 +190,3 @@ private fun ParsedFoodListItem(entry: ParsedFoodEntry, onClick: () -> Unit) {
         shape = MaterialTheme.shapes.medium,
     )
 }
-
-@Composable
-private fun FoodParsingException.asMessage(): String =
-    when (this) {
-        FoodParsingException.ApiKeyMissing -> stringResource(Res.string.error_ai_api_key_missing)
-        is FoodParsingException.ApiKeyRejected ->
-            stringResource(Res.string.error_ai_api_key_rejected)
-        is FoodParsingException.RequestFailed -> stringResource(Res.string.error_ai_request_failed)
-        is FoodParsingException.MalformedResponse ->
-            stringResource(Res.string.error_ai_malformed_response)
-    }

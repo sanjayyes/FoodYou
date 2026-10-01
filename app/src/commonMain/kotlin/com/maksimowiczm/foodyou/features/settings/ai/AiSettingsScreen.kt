@@ -43,7 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.maksimowiczm.foodyou.ai.domain.FoodParsingException
+import com.maksimowiczm.foodyou.features.ai.asMessage
 import com.maksimowiczm.foodyou.shared.ui.component.ArrowBackIconButton
 import com.maksimowiczm.foodyou.shared.ui.utility.LocalAppConfig
 import foodyou.app.generated.resources.*
@@ -253,14 +253,3 @@ private fun ModelPickerDialog(
         },
     )
 }
-
-@Composable
-private fun FoodParsingException.asMessage(): String =
-    when (this) {
-        FoodParsingException.ApiKeyMissing -> stringResource(Res.string.error_ai_api_key_missing)
-        is FoodParsingException.ApiKeyRejected ->
-            stringResource(Res.string.error_ai_api_key_rejected)
-        is FoodParsingException.RequestFailed -> stringResource(Res.string.error_ai_request_failed)
-        is FoodParsingException.MalformedResponse ->
-            stringResource(Res.string.error_ai_malformed_response)
-    }

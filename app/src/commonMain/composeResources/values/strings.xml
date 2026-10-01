@@ -366,8 +366,12 @@
     <string name="placeholder_food_description" description="Example of a food description">Two scrambled eggs and a slice of rye toast</string>
     <string name="action_parse">Parse</string>
     <string name="error_ai_api_key_missing">Add a Gemini API key in settings first</string>
-    <string name="error_ai_api_key_rejected">Google rejected that API key</string>
-    <string name="error_ai_request_failed">Could not reach Google, try again later</string>
+    <string name="error_ai_api_key_rejected">Google rejected that API key. Check it and save again</string>
+    <string name="error_ai_model_unavailable">That model is no longer available for your API key. Pick a different one in settings</string>
+    <string name="error_ai_quota_exceeded">You have used up your Gemini quota. Check your plan and try again later</string>
+    <string name="error_ai_service_unavailable">Google is busy right now. Try again in a moment</string>
+    <string name="error_ai_network_unavailable">Could not reach Google. Check your connection and try again</string>
+    <string name="error_ai_invalid_request">Google could not understand the request. Try a different model</string>
     <string name="error_ai_malformed_response">Could not read the reply from Google</string>
 
 </resources>

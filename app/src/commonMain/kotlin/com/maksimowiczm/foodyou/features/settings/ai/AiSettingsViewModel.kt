@@ -100,6 +100,13 @@ internal class AiSettingsViewModel(
                 )
             } catch (e: FoodParsingException) {
                 state.copy(isLoadingModels = false, error = e)
+            } catch (e: Exception) {
+                // Anything the client did not classify must still surface, otherwise the user is
+                // left staring at a spinner with no explanation.
+                state.copy(
+                    isLoadingModels = false,
+                    error = FoodParsingException.NetworkUnavailable(detail = e.message),
+                )
             }
         }
     }

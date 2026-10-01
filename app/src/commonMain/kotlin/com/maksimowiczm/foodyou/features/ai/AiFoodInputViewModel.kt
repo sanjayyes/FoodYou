@@ -83,9 +83,8 @@ internal class AiFoodInputViewModel(
                         onFailure = { throwable ->
                             AiFoodInputUiState.Error(
                                 throwable as? FoodParsingException
-                                    ?: FoodParsingException.RequestFailed(
-                                        status = 0,
-                                        detail = throwable.message,
+                                    ?: FoodParsingException.NetworkUnavailable(
+                                        detail = throwable.message
                                     )
                             )
                         },
