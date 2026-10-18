@@ -32,6 +32,10 @@ interface GeminiClient {
     /**
      * Lists model ids that support content generation, without the `models/` prefix.
      *
+     * Not surfaced in the UI. Google's `listModels` advertises dated snapshots and preview models
+     * that do not serve `generateContent` for a given project, so the result is not a list of
+     * usable choices — see [DEFAULT_GEMINI_MODEL].
+     *
      * @param apiKey Gemini API key
      * @throws FoodParsingException on any failure
      */

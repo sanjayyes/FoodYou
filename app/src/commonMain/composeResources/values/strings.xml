@@ -355,10 +355,9 @@
     <string name="headline_ai_assistant">AI assistant</string>
     <string name="description_ai_assistant">Describe a meal in your own words and turn it into a food product</string>
     <string name="description_gemini_api_key">Your key is stored encrypted on this device and never leaves it except to reach Google</string>
-    <string name="headline_gemini_model">Model</string>
-    <string name="headline_select_model">Select model</string>
-    <string name="neutral_ai_default_model">Default (%1$s)</string>
-    <string name="description_model_requires_api_key">Save a valid API key to load the available models</string>
+    <string name="action_test_connection">Test connection</string>
+    <string name="neutral_ai_connection_checking">Checking the connection…</string>
+    <string name="neutral_ai_connection_ok">Connected · %1$s</string>
     <string name="neutral_ai_parsing">Working out the nutrition…</string>
     <string name="neutral_ai_no_results">No food found in that description</string>
     <string name="headline_ai_food_input">Describe a meal</string>

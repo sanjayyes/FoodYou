@@ -2,9 +2,9 @@ package com.maksimowiczm.foodyou.features.settings.ai
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.maksimowiczm.foodyou.ai.domain.DEFAULT_GEMINI_MODEL
 import com.maksimowiczm.foodyou.ai.domain.FoodParsingException
 import com.maksimowiczm.foodyou.ai.domain.FoodParsingService
+import com.maksimowiczm.foodyou.ai.domain.asFoodParsingException
 import com.maksimowiczm.foodyou.preferences.domain.AiPreferences
 import com.maksimowiczm.foodyou.preferences.domain.UserPreferencesRepository
 import com.maksimowiczm.foodyou.preferences.domain.observe
@@ -14,18 +14,18 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-internal data class AiSettingsUiState(
-    val models: List<String> = emptyList(),
-    val isLoadingModels: Boolean = false,
-    val error: FoodParsingException? = null,
-)
-
+/**
+ * Backing state for [AiSettingsScreen].
+ *
+ * Holds only the API key. The model used to be selectable here, which was removed: Google's
+ * `listModels` advertises dated snapshots and preview models that do not serve `generateContent`,
+ * so any stored choice locked the feature into a permanently failing state.
+ */
 internal class AiSettingsViewModel(
     private val foodParsingService: FoodParsingService,
     private val preferencesRepository: UserPreferencesRepository,
@@ -45,73 +45,59 @@ internal class AiSettingsViewModel(
                     runBlocking { preferencesRepository.observe<AiPreferences>().first() },
             )
 
-    private val _uiState = MutableStateFlow(AiSettingsUiState())
-    val uiState: StateFlow<AiSettingsUiState> = _uiState.asStateFlow()
+    private val _connectionState = MutableStateFlow<AiConnectionState>(AiConnectionState.Idle)
+    val connectionState: StateFlow<AiConnectionState> = _connectionState.asStateFlow()
 
-    /** The model in effect, falling back to [DEFAULT_GEMINI_MODEL] when unset. */
-    val selectedModel: StateFlow<String> =
-        preferences
-            .map { it.geminiModel ?: DEFAULT_GEMINI_MODEL }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(2_000),
-                initialValue = DEFAULT_GEMINI_MODEL,
-            )
-
-    /**
-     * Persists [apiKey]; a blank value clears the stored key.
-     *
-     * Reloads the model list with the new key before returning, so callers must not trigger a
-     * separate refresh — the persisted value is not visible synchronously.
-     */
+    /** Persists [apiKey]; a blank value clears the stored key. */
     fun saveApiKey(apiKey: String) {
         val trimmed = apiKey.trim().takeIf { it.isNotEmpty() }
         viewModelScope.launch {
             preferencesRepository.update<AiPreferences> { it.copy(geminiApiKey = trimmed) }
-            loadModels(trimmed)
+            // A previous result described the old key, so it no longer applies.
+            _connectionState.value = AiConnectionState.Idle
         }
     }
 
-    fun selectModel(model: String) {
-        viewModelScope.launch {
-            preferencesRepository.update<AiPreferences> { it.copy(geminiModel = model) }
-        }
-    }
-
-    /** Reloads the model list for the currently stored key. */
-    fun refreshModels() {
-        viewModelScope.launch { loadModels(preferences.value.geminiApiKey) }
-    }
-
-    private suspend fun loadModels(apiKey: String?) {
-        if (apiKey.isNullOrBlank()) {
-            _uiState.update { it.copy(models = emptyList(), isLoadingModels = false, error = null) }
+    /**
+     * Probes the stored key against the live API so the user can confirm it works before relying on
+     * it. The model list is used only as a credential and reachability check — its contents are
+     * ignored, because they are not a list of usable choices.
+     */
+    fun testConnection() {
+        val key = preferences.value.geminiApiKey?.trim()
+        if (key.isNullOrEmpty()) {
+            _connectionState.value = AiConnectionState.Failed(FoodParsingException.ApiKeyMissing)
             return
         }
 
-        _uiState.update { it.copy(isLoadingModels = true, error = null) }
+        _connectionState.value = AiConnectionState.Checking
 
-        _uiState.update { state ->
-            try {
-                state.copy(
-                    isLoadingModels = false,
-                    models = foodParsingService.models(apiKey),
-                    error = null,
-                )
-            } catch (e: FoodParsingException) {
-                state.copy(isLoadingModels = false, error = e)
-            } catch (e: Exception) {
-                // Anything the client did not classify must still surface, otherwise the user is
-                // left staring at a spinner with no explanation.
-                state.copy(
-                    isLoadingModels = false,
-                    error = FoodParsingException.NetworkUnavailable(detail = e.message),
-                )
-            }
+        viewModelScope.launch {
+            _connectionState.value =
+                runCatching { foodParsingService.models(key) }
+                    .fold(
+                        onSuccess = { AiConnectionState.Connected },
+                        onFailure = {
+                            // Never let a raw throwable reach the UI, otherwise the user sees a
+                            // generic message and the real cause is unrecoverable.
+                            AiConnectionState.Failed(it.asFoodParsingException())
+                        },
+                    )
         }
     }
+}
 
-    fun dismissError() {
-        _uiState.update { it.copy(error = null) }
-    }
+/** Outcome of the on-demand connection test. */
+internal sealed interface AiConnectionState {
+    /** No test has been requested since the key last changed. */
+    data object Idle : AiConnectionState
+
+    /** A probe is in flight. */
+    data object Checking : AiConnectionState
+
+    /** The stored key reached Gemini. */
+    data object Connected : AiConnectionState
+
+    /** The probe failed; [error] says why. */
+    data class Failed(val error: FoodParsingException) : AiConnectionState
 }

@@ -34,6 +34,25 @@ class GeminiErrorClassifierTests {
     }
 
     @Test
+    fun a_malformed_key_on_a_400_should_mean_the_key_was_rejected() {
+        // Observed from the live API: a bad key answers 400 INVALID_ARGUMENT, not 401, so the
+        // status field says nothing useful and only the message identifies the problem. Without
+        // this the UI told the user to try a different model, which is the opposite of the fix.
+        val failure =
+            classify(400, "INVALID_ARGUMENT", "API key not valid. Please pass a valid API key.")
+
+        assertIs<FoodParsingException.ApiKeyRejected>(failure)
+    }
+
+    @Test
+    fun a_400_mentioning_an_api_key_but_not_rejecting_one_should_stay_invalid_request() {
+        // Guard against over-matching: the message must actually accuse the key.
+        val failure = classify(400, "INVALID_ARGUMENT", "Field 'api_key' is not supported here")
+
+        assertIs<FoodParsingException.InvalidRequest>(failure)
+    }
+
+    @Test
     fun malformed_payload_on_a_400_should_mean_invalid_request_not_a_bad_key() {
         val failure = classify(400, "INVALID_ARGUMENT", "Invalid JSON payload received")
 

@@ -80,7 +80,7 @@ internal class AiFoodInputViewModel(
                         foodParsingService.parse(
                             description = description,
                             apiKey = apiKey,
-                            model = settings.geminiModel ?: DEFAULT_GEMINI_MODEL,
+                            model = DEFAULT_GEMINI_MODEL,
                         )
                     }
                     .fold(

@@ -1,40 +1,31 @@
 package com.maksimowiczm.foodyou.features.settings.ai
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedSecureTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -43,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.maksimowiczm.foodyou.ai.domain.DEFAULT_GEMINI_MODEL
 import com.maksimowiczm.foodyou.features.ai.asMessage
 import com.maksimowiczm.foodyou.shared.ui.component.ArrowBackIconButton
 import com.maksimowiczm.foodyou.shared.ui.utility.LocalAppConfig
@@ -56,20 +48,13 @@ fun AiSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val viewModel: AiSettingsViewModel = koinViewModel()
 
     val preferences = viewModel.preferences.collectAsStateWithLifecycle().value
-    val selectedModel = viewModel.selectedModel.collectAsStateWithLifecycle().value
-    val uiState = viewModel.uiState.collectAsStateWithLifecycle().value
-
-    LaunchedEffect(Unit) { viewModel.refreshModels() }
+    val connectionState = viewModel.connectionState.collectAsStateWithLifecycle().value
 
     AiSettingsScreen(
         apiKey = preferences.geminiApiKey.orEmpty(),
-        selectedModel = selectedModel,
-        isDefaultModel = preferences.geminiModel == null,
-        uiState = uiState,
+        connectionState = connectionState,
         onSaveApiKey = viewModel::saveApiKey,
-        onSelectModel = viewModel::selectModel,
-        onRefreshModels = viewModel::refreshModels,
-        onDismissError = viewModel::dismissError,
+        onTestConnection = viewModel::testConnection,
         onBack = onBack,
         modifier = modifier,
     )
@@ -78,13 +63,9 @@ fun AiSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 private fun AiSettingsScreen(
     apiKey: String,
-    selectedModel: String,
-    isDefaultModel: Boolean,
-    uiState: AiSettingsUiState,
+    connectionState: AiConnectionState,
     onSaveApiKey: (String) -> Unit,
-    onSelectModel: (String) -> Unit,
-    onRefreshModels: () -> Unit,
-    onDismissError: () -> Unit,
+    onTestConnection: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -93,7 +74,6 @@ private fun AiSettingsScreen(
 
     val apiKeyState = rememberTextFieldState(apiKey)
     var hideKey by rememberSaveable { mutableStateOf(true) }
-    var showModelPicker by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -158,98 +138,51 @@ private fun AiSettingsScreen(
                 }
             }
 
-            uiState.error?.let { error ->
-                Text(
-                    text = error.asMessage(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
+            OutlinedButton(
+                onClick = onTestConnection,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = apiKey.isNotBlank() && connectionState !is AiConnectionState.Checking,
+                shapes = ButtonDefaults.shapes(),
+            ) {
+                Text(stringResource(Res.string.action_test_connection))
+                if (connectionState is AiConnectionState.Checking) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp).padding(start = 4.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
             }
 
-            SegmentedListItem(
-                onClick = {
-                    onDismissError()
-                    onRefreshModels()
-                    showModelPicker = true
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shapes = ListItemDefaults.segmentedShapes(index = 0, count = 1),
-                colors =
-                    ListItemDefaults.segmentedColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer
-                    ),
-                leadingContent = { Icon(Icons.Outlined.AutoAwesome, contentDescription = null) },
-                trailingContent = {
-                    if (uiState.isLoadingModels) CircularProgressIndicator()
-                },
-                content = { Text(stringResource(Res.string.headline_gemini_model)) },
-                supportingContent = {
-                    Text(
-                        text =
-                            if (isDefaultModel)
-                                stringResource(Res.string.neutral_ai_default_model, selectedModel)
-                            else selectedModel
-                    )
-                },
-            )
+            AiConnectionStatus(connectionState)
         }
-    }
-
-    if (showModelPicker) {
-        ModelPickerDialog(
-            models = uiState.models,
-            selectedModel = selectedModel,
-            isLoading = uiState.isLoadingModels,
-            onSelect = {
-                onSelectModel(it)
-                showModelPicker = false
-            },
-            onDismissRequest = { showModelPicker = false },
-        )
     }
 }
 
+/**
+ * Renders the outcome of the connection test.
+ *
+ * [Idle] deliberately renders nothing: a result is only ever shown for a test the user just
+ * requested, so the screen never claims a key works based on an older session.
+ */
 @Composable
-private fun ModelPickerDialog(
-    models: List<String>,
-    selectedModel: String,
-    isLoading: Boolean,
-    onSelect: (String) -> Unit,
-    onDismissRequest: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        title = { Text(stringResource(Res.string.headline_select_model)) },
-        text = {
-            when {
-                isLoading -> CircularProgressIndicator()
-                models.isEmpty() ->
-                    Text(
-                        text = stringResource(Res.string.description_model_requires_api_key),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+private fun AiConnectionStatus(state: AiConnectionState) {
+    val (text, isError) =
+        when (state) {
+            AiConnectionState.Idle -> return
+            AiConnectionState.Checking ->
+                stringResource(Res.string.neutral_ai_connection_checking) to false
 
-                else ->
-                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
-                        items(models) { model ->
-                            ListItem(
-                                headlineContent = { Text(model) },
-                                modifier = Modifier.clickable { onSelect(model) },
-                                trailingContent = {
-                                    RadioButton(
-                                        selected = model == selectedModel,
-                                        onClick = null,
-                                    )
-                                },
-                            )
-                        }
-                    }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismissRequest, shapes = ButtonDefaults.shapes()) {
-                Text(stringResource(Res.string.action_cancel))
-            }
-        },
+            AiConnectionState.Connected ->
+                stringResource(Res.string.neutral_ai_connection_ok, DEFAULT_GEMINI_MODEL) to false
+
+            is AiConnectionState.Failed -> state.error.asMessage() to true
+        }
+
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color =
+            if (isError) MaterialTheme.colorScheme.error
+            else MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
